@@ -1,5 +1,7 @@
 const assert = require("assert");
 
+const randomSelection = (array) => array[Math.floor(Math.random() * array.length)];
+
 // a board takes the form:
 // [_, _, _, _, _, _, _, _, _]
 // each spot is 0 if the spot is free, 1 if the first player has it, and 2 if the second
@@ -33,6 +35,7 @@ const randomMove = (board, player) => {
 const makeMove = (board, memory, player) => {
   assert(board.hasOwnProperty("length")); // make sure board is an array
   assert(typeof(memory) === "object");
+  assert(memory);
   assert(player === 1 || player === 2);
 
   // if if doesn't have a remembered move, then make one and remember it
@@ -83,11 +86,18 @@ const winner = (board) => {
 
 // runs a game of tic-tac-toe and returns 1 if the first won, 2 if the second won, and 0 if neither
 const winnerOfGame = (memory1, memory2) => {
+  assert(memory1);
+  assert(memory2);
   let board = [0, 0, 0, 0, 0, 0, 0, 0, 0];
-  while (true) {
+  for (let i = 0; i < 1000; i++) {
     board = makeMove(board, memory1, 1);
     if (winner(board)) {
       return 1;
+    }
+
+    // if the board is full, then it's a draw
+    if (board.filter((spot) => !spot).length === 0) {
+      return 0;
     }
 
     board = makeMove(board, memory2, 2);
@@ -102,9 +112,12 @@ const winnerOfGame = (memory1, memory2) => {
   }
 };
 
-for (let oiehgioehg = 0; oiehgioehg < 10000; oiehgioehg++) {
-  // now, we do the AI part
-  let memories = [{}, {}, {}, {}];
+// now, we do the AI part
+let memories = [{}, {}, {}, {}];
+const startTime = new Date();
+const duration = 2; // seconds
+// run the AI for at least a given amount of time
+while (new Date() - startTime < duration * 1000) {
   // for every other board, compete it with the next one
   assert(memories.length % 2 === 0); // must be an even number of memories
 
@@ -116,7 +129,7 @@ for (let oiehgioehg = 0; oiehgioehg < 10000; oiehgioehg++) {
       memories[i + Math.round(Math.random())] = null;
     } else {
       const losingMemory = (winningMemory === 1 ? 2 : 1);
-      memories[losingMemory] = null;
+      memories[i + losingMemory - 1] = null;
     }
   }
 
@@ -134,8 +147,42 @@ for (let oiehgioehg = 0; oiehgioehg < 10000; oiehgioehg++) {
     for (let board in randomMother) {
       child[board] = randomMother[board];
     }
+
+    // introduce random alleles by mutatations
+    const chanceOfRandomAllele = 1 / 100;
+    for (let board in child) {
+      if (Math.random() < chanceOfRandomAllele) {
+        const spots = {0: 0, 1: 0, 2: 0};
+        for (let spot of board.split(",")) {
+          spots[spot]++;
+        }
+        const lastPlayer = spots[1] > spots[2] ? 1 : 2;
+        const outputBoardPlayerIndeces = child[board]
+          .map((_, i) => i)
+          .filter(i => child[board][i] === lastPlayer);
+        const randomPlayerIndex = randomSelection(outputBoardPlayerIndeces);
+        child[board][randomPlayerIndex] = 0;
+        child[board] = randomMove(child[board], lastPlayer);
+      }
+    }
     memories.push(child);
   }
 }
 
-console.log(memories);
+while (memories.length > 1) {
+  // fight
+  for (let i = 0; i < memories.length; i += 2) {
+    const winningMemory = winnerOfGame(memories[i], memories[i+1]);
+    // if they had a draw, then randomly remove one
+    if (!winningMemory) {
+      memories[i + Math.round(Math.random())] = null;
+    } else {
+      const losingMemory = (winningMemory === 1 ? 2 : 1);
+      memories[i + losingMemory - 1] = null;
+    }
+  }
+  memories = memories.filter(memory => memory !== null); // only the living
+}
+
+console.log("The final memory has", Object.keys(memories[0]).length, "genes");
+console.log(memories[0]);
